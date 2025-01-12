@@ -1,0 +1,18 @@
+# Directories
+sounds_directory: /usr/share/asterisk/sounds/en
+custom_sounds_directory: /usr/share/asterisk/sounds/custom 
+cache_directory: /usr/share/asterisk/sounds/custom/cache
+
+# Sound handling
+on_missing: error # error, beep or skip
+beep_sound: beeperr
+silence_sound: silence/1
+max_phrase_words_for_filenames: 5
+
+# TTS settings
+auto_generate_words: true
+asl_tts_bin: asl-tts
+
+# Cache settings
+max_cache_files: 100
+max_cache_age_days: -1 # -1 means no limit
