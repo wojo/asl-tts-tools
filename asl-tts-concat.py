@@ -42,18 +42,36 @@ def main():
     if not args.node and not args.file:
         parser.error("Either -n/--node or -f/--file (or both) must be specified")
 
+    # Check config file exists
+    if not Path(args.config).exists():
+        sys.exit(f"Error: Config file not found: {args.config}")
+
     # Load config
     config = Config.from_file(args.config)
-    config_dict = config.to_dict()
+
+    # Check critical directories exist
+    if not config.sounds_directory.exists():
+        sys.exit(f"Error: Base sounds directory not found: {config.sounds_directory}")
+
+    # Check TTS binary exists if auto-generation enabled
+    if config.auto_generate_words or args.generate_tts:
+        tts_bin = Path(config.asl_tts_bin)
+        if not tts_bin.is_absolute():
+            # Try to find it in PATH
+            tts_path = shutil.which(config.asl_tts_bin)
+            if not tts_path:
+                sys.exit(f"Error: TTS binary not found in PATH: {config.asl_tts_bin}")
+        elif not tts_bin.exists():
+            sys.exit(f"Error: TTS binary not found: {config.asl_tts_bin}")
 
     if args.verbose >= 1:
         print("Configuration:")
-        for key, value in config_dict.items():
+        for key, value in config.to_dict().items():
             print(f"  {key}: {value}")
 
     # Override auto-generate setting if specified
     if args.generate_tts:
-        config_dict["auto_generate_words"] = True
+        config.auto_generate_words = True
 
     # Load available sound files
     sounds = load_sound_files(config, args.verbose)
@@ -75,13 +93,11 @@ def main():
         print(f"Initial tokens: {tokens}")
 
     # Find matching sound files
-    matches = find_sound_matches(tokens, sounds, config_dict, args.verbose)
+    matches = find_sound_matches(tokens, sounds, config, args.verbose)
 
     # Create cache file for concatenated audio
-    filename = sanitize_filename_with_hash(
-        text, config_dict["max_phrase_words_for_filenames"]
-    )
-    cache_file = Path(config_dict["cache_directory"]) / f"{filename}.ul"
+    filename = sanitize_filename_with_hash(text, config.max_phrase_words_for_filenames)
+    cache_file = Path(config.cache_directory) / f"{filename}.ul"
 
     # Concatenate audio files
     concat_audio(matches, str(cache_file))
@@ -100,9 +116,9 @@ def main():
     if args.verbose >= 2:
         print("\nPerforming cache cleanup...")
     cache_cleanup(
-        config_dict["cache_directory"],
-        config_dict["max_cache_age_days"],
-        config_dict["max_cache_files"],
+        config.cache_directory,
+        config.max_cache_age_days,
+        config.max_cache_files,
         args.verbose,
     )
 

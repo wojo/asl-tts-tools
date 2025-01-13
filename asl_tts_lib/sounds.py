@@ -3,6 +3,8 @@
 from pathlib import Path
 from .config import Config
 from typing import Dict
+import os
+import sys
 
 SUPPORTED_ASTERISK_SOUND_EXTENSIONS = [
     ".ul",
@@ -127,32 +129,47 @@ def load_sound_files(config: Config, verbose: int = 0) -> Dict[str, str]:
         if verbose >= 1:
             print(f"Loading sounds from directory: {directory}")
 
-        if directory.exists():
-            for path in directory.rglob("*.*"):
-                if any(path.name.startswith(prefix) for prefix in SKIP_PREFIXES) or any(
-                    path.name.endswith(suffix) for suffix in SKIP_SUFFIXES
-                ):
-                    continue
-
-                # Check if the file extension is supported by Asterisk
-                if path.suffix.lower() in SUPPORTED_ASTERISK_SOUND_EXTENSIONS:
-                    relative_path = str(path.relative_to(directory).with_suffix(""))
-                    files_dict[relative_path] = str(path)
-                else:
-                    print(f"Skipping unsupported sound file: {path}")
-
-                if verbose >= 3:
-                    print(f"  {relative_path} -> {path}")
-
-            if verbose >= 1:
-                print(f"Loaded {len(files_dict)} sound files from {directory}")
-        else:
+        if not directory.exists():
             if verbose >= 1:
                 print(f"Directory {directory} does not exist")
+            return
+
+        # Check if directory is readable
+        if not os.access(directory, os.R_OK):
+            raise PermissionError(f"Cannot read sounds directory: {directory}")
+
+        for path in directory.rglob("*.*"):
+            if any(path.name.startswith(prefix) for prefix in SKIP_PREFIXES) or any(
+                path.name.endswith(suffix) for suffix in SKIP_SUFFIXES
+            ):
+                continue
+
+            # Check if the file extension is supported by Asterisk
+            if path.suffix.lower() in SUPPORTED_ASTERISK_SOUND_EXTENSIONS:
+                # Check if file is readable
+                if not os.access(path, os.R_OK):
+                    print(f"Warning: Cannot read sound file: {path}", file=sys.stderr)
+                    continue
+
+                relative_path = str(path.relative_to(directory).with_suffix(""))
+                files_dict[relative_path] = str(path)
+            else:
+                print(f"Skipping unsupported sound file: {path}")
+
+            if verbose >= 3:
+                print(f"  {relative_path} -> {path}")
+
+        if verbose >= 1:
+            print(f"Loaded {len(files_dict)} sound files from {directory}")
 
     # Load from base and custom sounds directories
     load_from_directory(config.sounds_directory, base_sounds_directory_files)
     load_from_directory(config.custom_sounds_directory, custom_sounds_directory_files)
+
+    if len(base_sounds_directory_files) == 0:
+        raise ValueError(
+            f"No sound files found in base directory: {config.sounds_directory}"
+        )
 
     if verbose >= 2:
         print(f"Available base sounds: {len(base_sounds_directory_files)}")

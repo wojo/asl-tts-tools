@@ -1,8 +1,8 @@
 """Sound file matching utilities."""
 
 from typing import Dict, List, Optional, Tuple, Any
-from pathlib import Path
 import sys
+from asl_tts_lib.config import Config
 from asl_tts_lib.sounds import normalize_phrase
 from asl_tts_lib.tokenizer import _is_word_token
 from asl_tts_lib.tts import should_generate_phrase, generate_missing_phrase
@@ -12,14 +12,14 @@ import os
 
 
 def find_sound_matches(
-    tokens: List[str], sounds: Dict[str, str], config: dict, verbose: int = 0
+    tokens: List[str], sounds: Dict[str, str], config: Config, verbose: int = 0
 ) -> List[str]:
     """Find matching sound files for tokens.
 
     Args:
         tokens: List of tokens to match
         sounds: Dictionary mapping normalized phrases to full file paths
-        config: Configuration dictionary
+        config: Configuration object
         verbose: Verbosity level (0=none, 1=basic, 2=detailed)
 
     Returns:
@@ -36,7 +36,7 @@ def find_sound_matches(
         if tokens[i].startswith("(") and tokens[i].endswith(")"):
             phrase = tokens[i][1:-1]  # Remove parentheses
             normalized_phrase = sanitize_filename_with_hash(
-                phrase, config["max_phrase_words_for_filenames"]
+                phrase, config.max_phrase_words_for_filenames
             )
             if normalized_phrase in sounds:
                 path = sounds[normalized_phrase]
@@ -91,12 +91,12 @@ def find_sound_matches(
         # Try punctuation/special characters
         elif len(tokens[i]) == 1 and not tokens[i].isalnum():
             if tokens[i] in PAUSE_CHARS:
-                if config["silence_sound"] in sounds:
+                if config.silence_sound in sounds:
                     if verbose >= 1:
                         print(
-                            f"Using silence sound for '{tokens[i]}' -> {config['silence_sound']}"
+                            f"Using silence sound for '{tokens[i]}' -> {config.silence_sound}"
                         )
-                    matches.append(sounds[config["silence_sound"]])
+                    matches.append(sounds[config.silence_sound])
                     i += 1
                     continue
             else:
@@ -140,7 +140,7 @@ def find_sound_matches(
         if any(c.islower() for c in tokens[i]):
             if should_generate_phrase(tokens[i], verbose):
                 normalized_phrase = sanitize_filename_with_hash(
-                    tokens[i], config["max_phrase_words_for_filenames"]
+                    tokens[i], config.max_phrase_words_for_filenames
                 )
                 tts_match = generate_missing_phrase(
                     tokens[i], normalized_phrase, config, verbose
@@ -154,25 +154,23 @@ def find_sound_matches(
         if verbose >= 1:
             print(f"No match found for token: {tokens[i]}")
 
-        if config["on_missing"] == "error":
+        if config.on_missing == "error":
             raise ValueError(f"No match found for token: {tokens[i]}")
-        elif config["on_missing"] == "beep":
-            if config["beep_sound"] in sounds:
+        elif config.on_missing == "beep":
+            if config.beep_sound in sounds:
                 if verbose >= 1:
-                    print(
-                        f"Using beep sound for '{tokens[i]}' -> {config['beep_sound']}"
-                    )
-                matches.append(sounds[config["beep_sound"]])
+                    print(f"Using beep sound for '{tokens[i]}' -> {config.beep_sound}")
+                matches.append(sounds[config.beep_sound])
             else:
                 print(
-                    f"Warning: Beep sound not found: {config['beep_sound']}",
+                    f"Warning: Beep sound not found: {config.beep_sound}",
                     file=sys.stderr,
                 )
-        elif config["on_missing"] == "skip":
+        elif config.on_missing == "skip":
             i += 1
             continue
         else:
-            raise ValueError(f"Invalid on_missing value: {config['on_missing']}")
+            raise ValueError(f"Invalid on_missing value: {config.on_missing}")
 
     return matches
 

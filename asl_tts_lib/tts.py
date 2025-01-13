@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 from .utils import sanitize_filename_with_hash, normalize_key
+from .config import Config
+import sys
 
 
 def should_generate_phrase(phrase: str, verbose: int = 0) -> bool:
@@ -61,21 +63,35 @@ def should_generate_phrase(phrase: str, verbose: int = 0) -> bool:
 
 
 def generate_missing_phrase(
-    phrase: str, normalized_phrase: str, config: dict, verbose: int = 0
+    phrase: str, normalized_phrase: str, config: Config, verbose: int = 0
 ) -> Optional[str]:
     """Generate TTS for a missing phrase.
 
     Args:
         phrase: Original phrase to generate TTS for
         normalized_phrase: Normalized phrase to use for TTS
-        config: Configuration dictionary
+        config: Configuration object
         verbose: Verbosity level (0=none, 1=basic, 2=detailed)
 
     Returns:
         Path to generated sound file if successful, None otherwise
     """
+    # Check if custom directory exists and is writable
+    if not config.custom_sounds_directory.exists():
+        try:
+            config.custom_sounds_directory.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"Error creating custom sounds directory: {e}", file=sys.stderr)
+            return None
 
-    custom_dir = Path(config["custom_sounds_directory"])
+    if not os.access(config.custom_sounds_directory, os.W_OK):
+        print(
+            f"Error: Cannot write to custom sounds directory: {config.custom_sounds_directory}",
+            file=sys.stderr,
+        )
+        return None
+
+    custom_dir = config.custom_sounds_directory
 
     # For phrases in parentheses, strip them and use normalized version
     if phrase.startswith("(") and phrase.endswith(")"):
@@ -88,19 +104,26 @@ def generate_missing_phrase(
 
     # Create sanitized filename
     base_filename = sanitize_filename_with_hash(
-        normalized, config["max_phrase_words_for_filenames"]
+        normalized, config.max_phrase_words_for_filenames
     )
     base_path = custom_dir / base_filename
 
     # Check if file already exists
     if base_path.with_suffix(".ul").exists():
+        if not os.access(base_path.with_suffix(".ul"), os.R_OK):
+            print(
+                f"Error: Cannot read existing TTS file: {base_path.with_suffix('.ul')}",
+                file=sys.stderr,
+            )
+            return None
+
         if verbose >= 1:
             print(f"Found existing TTS file for phrase: {phrase}")
         return str(base_path.with_suffix(".ul"))
 
     # Generate TTS using configured command
     try:
-        tts_bin = config.get("asl_tts_bin", "asl-tts")
+        tts_bin = config.asl_tts_bin
 
         # For phrases, use the inner content without parentheses
         tts_text = inner_phrase if phrase.startswith("(") else phrase
