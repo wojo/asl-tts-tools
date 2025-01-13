@@ -20,6 +20,7 @@ class Config:
     beep_sound: str = "beep"
     silence_sound: str = "silence/1"
     max_phrase_words_for_filenames: int = 5
+    auto_phrase_matching: bool = True
 
     # TTS settings
     auto_generate_words: bool = True

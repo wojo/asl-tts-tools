@@ -138,10 +138,25 @@ def load_sound_files(config: Config, verbose: int = 0) -> Dict[str, str]:
         if not os.access(directory, os.R_OK):
             raise PermissionError(f"Cannot read sounds directory: {directory}")
 
-        for path in directory.rglob("*.*"):
+        for path in directory.rglob("*"):
             if any(path.name.startswith(prefix) for prefix in SKIP_PREFIXES) or any(
                 path.name.endswith(suffix) for suffix in SKIP_SUFFIXES
             ):
+                continue
+
+            # skip directories
+            if path.is_dir():
+                continue
+
+            # skip any folders starting with NORMALIZATION_BLACKLIST
+            # Skip paths with components starting with normalization blacklist
+            rel_path = path.relative_to(directory)
+            if not any(
+                part.startswith(tuple(NORMALIZATION_BLACKLIST))
+                for part in rel_path.parts
+            ):
+                if verbose >= 2:
+                    print(f"Skipping blacklisted path: {path}")
                 continue
 
             # Check if the file extension is supported by Asterisk

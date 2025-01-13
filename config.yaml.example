@@ -8,6 +8,7 @@ on_missing: error # error, beep or skip
 beep_sound: beeperr
 silence_sound: silence/1
 max_phrase_words_for_filenames: 5
+auto_phrase_matching: false  # Whether to try matching bare phrases against Asterisk sounds
 
 # TTS settings
 auto_generate_words: true

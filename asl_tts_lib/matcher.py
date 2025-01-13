@@ -55,7 +55,7 @@ def find_sound_matches(
                     continue
 
         # Try exact match (e.g. {rpt/connected-to})
-        elif tokens[i].startswith("{") and tokens[i].endswith("}"):
+        if tokens[i].startswith("{") and tokens[i].endswith("}"):
             path = normalize_phrase(tokens[i][1:-1])
             if path in sounds:
                 if verbose >= 1:
@@ -63,6 +63,10 @@ def find_sound_matches(
                 matches.append(sounds[path])
                 i += 1
                 continue
+            else:
+                if verbose >= 1:
+                    print(f"No match found for '{tokens[i]}' -> {path}")
+                # TODO, use the missing sound logic here (beep, silence, skip, error)
 
         # Try uppercase word as individual letters first
         if tokens[i].isupper() and tokens[i].isalpha():
@@ -73,7 +77,7 @@ def find_sound_matches(
                 continue
 
         # Try phonetic match (e.g. [ABC])
-        elif tokens[i].startswith("[") and tokens[i].endswith("]"):
+        if tokens[i].startswith("[") and tokens[i].endswith("]"):
             phonetic_matches = _try_phonetic_match(tokens[i], sounds, verbose)
             if phonetic_matches:
                 matches.extend(phonetic_matches)
@@ -81,46 +85,15 @@ def find_sound_matches(
                 continue
 
         # Try digit sequence
-        elif tokens[i].isdigit():
+        if tokens[i].isdigit():
             digit_matches = _try_digit_match(tokens[i], sounds, verbose)
             if digit_matches:
                 matches.extend(digit_matches)
                 i += 1
                 continue
 
-        # Try punctuation/special characters
-        elif len(tokens[i]) == 1 and not tokens[i].isalnum():
-            if tokens[i] in PAUSE_CHARS:
-                if config.silence_sound in sounds:
-                    if verbose >= 1:
-                        print(
-                            f"Using silence sound for '{tokens[i]}' -> {config.silence_sound}"
-                        )
-                    matches.append(sounds[config.silence_sound])
-                    i += 1
-                    continue
-            else:
-                if tokens[i] in CHAR_TO_DIGIT_MAP:
-                    key = f"digits/{CHAR_TO_DIGIT_MAP[tokens[i]]}"
-                    if key in sounds:
-                        if verbose >= 1:
-                            print(f"Found digit sound match for '{tokens[i]}' -> {key}")
-                        matches.append(sounds[key])
-                        i += 1
-                        continue
-                elif tokens[i] in CHAR_TO_LETTER_MAP:
-                    key = f"letters/{CHAR_TO_LETTER_MAP[tokens[i]]}"
-                    if key in sounds:
-                        if verbose >= 1:
-                            print(
-                                f"Found letter sound match for '{tokens[i]}' -> {key}"
-                            )
-                        matches.append(sounds[key])
-                        i += 1
-                        continue
-
         # Try mixed alphanumeric as individual chars (e.g. A1, 1B)
-        elif any(c.isalnum() for c in tokens[i]) and not any(
+        if any(c.isalnum() for c in tokens[i]) and not any(
             c.islower() for c in tokens[i]
         ):
             mixed_matches = _try_mixed_match(tokens[i], sounds, verbose)
@@ -129,12 +102,40 @@ def find_sound_matches(
                 i += 1
                 continue
 
-        # Try phrase match - but don't skip other token matches
-        phrase_match, consumed = _try_phrase_match(tokens[i:], sounds, verbose)
-        if phrase_match:
-            matches.append(phrase_match)
-            i += consumed
+        # Try punctuation/special characters/manual matches
+        if tokens[i] in PAUSE_CHARS:
+            if config.silence_sound in sounds:
+                if verbose >= 1:
+                    print(
+                        f"Using silence sound for '{tokens[i]}' -> {config.silence_sound}"
+                    )
+                matches.append(sounds[config.silence_sound])
+                i += 1
+                continue
+
+        if tokens[i] in CHAR_TO_DIGIT_MAP:
+            key = f"{'digits/' + CHAR_TO_DIGIT_MAP[tokens[i]]}"
+            print(f"Found letter sound match for '{tokens[i]}' -> {key}")
+            matches.append(sounds[key])
+            i += 1
             continue
+
+        if tokens[i] in CHAR_TO_LETTER_MAP:
+            key = f"letters/{CHAR_TO_LETTER_MAP[tokens[i]]}"
+            if key in sounds:
+                if verbose >= 1:
+                    print(f"Found letter sound match for '{tokens[i]}' -> {key}")
+                matches.append(sounds[key])
+                i += 1
+                continue
+
+        # Try phrase match if enabled
+        if config.auto_phrase_matching:
+            phrase_match, consumed = _try_phrase_match(tokens[i:], sounds, verbose)
+            if phrase_match:
+                matches.append(phrase_match)
+                i += consumed
+                continue
 
         # Try TTS generation for words with lowercase letters
         if any(c.islower() for c in tokens[i]):
