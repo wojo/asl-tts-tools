@@ -11,6 +11,44 @@ from .constants import CHAR_TO_DIGIT_MAP, CHAR_TO_LETTER_MAP, PAUSE_CHARS
 import os
 
 
+def _handle_missing_sound(
+    token: str, config: Config, sounds: Dict[str, str], verbose: int = 0
+) -> Optional[str]:
+    """Handle a missing sound based on config.
+
+    Args:
+        token: The token that was not found
+        config: Configuration object
+        sounds: Dictionary of available sound files
+        verbose: Verbosity level
+
+    Returns:
+        Path to sound file to use, or None if should skip
+
+    Raises:
+        ValueError: If on_missing is "error" or invalid
+    """
+    if verbose >= 1:
+        print(f"No match found for token: {token}")
+
+    if config.on_missing == "error":
+        raise ValueError(f"No match found for token: {token}")
+    elif config.on_missing == "beep":
+        if config.beep_sound in sounds:
+            if verbose >= 1:
+                print(f"Using beep sound for '{token}' -> {config.beep_sound}")
+            return sounds[config.beep_sound]
+        else:
+            print(
+                f"Warning: Beep sound not found: {config.beep_sound}", file=sys.stderr
+            )
+            return None
+    elif config.on_missing == "skip":
+        return None
+    else:
+        raise ValueError(f"Invalid on_missing value: {config.on_missing}")
+
+
 def find_sound_matches(
     tokens: List[str], sounds: Dict[str, str], config: Config, verbose: int = 0
 ) -> List[str]:
@@ -66,7 +104,13 @@ def find_sound_matches(
             else:
                 if verbose >= 1:
                     print(f"No match found for '{tokens[i]}' -> {path}")
-                # TODO, use the missing sound logic here (beep, silence, skip, error)
+                missing_sound = _handle_missing_sound(
+                    tokens[i], config, sounds, verbose
+                )
+                if missing_sound:
+                    matches.append(missing_sound)
+                i += 1
+                continue
 
         # Try uppercase word as individual letters first
         if tokens[i].isupper() and tokens[i].isalpha():
@@ -102,6 +146,14 @@ def find_sound_matches(
                 i += 1
                 continue
 
+        # Try phrase match if enabled
+        if config.auto_phrase_matching:
+            phrase_match, consumed = _try_phrase_match(tokens[i:], sounds, verbose)
+            if phrase_match:
+                matches.append(phrase_match)
+                i += consumed
+                continue
+
         # Try punctuation/special characters/manual matches
         if tokens[i] in PAUSE_CHARS:
             if config.silence_sound in sounds:
@@ -129,14 +181,6 @@ def find_sound_matches(
                 i += 1
                 continue
 
-        # Try phrase match if enabled
-        if config.auto_phrase_matching:
-            phrase_match, consumed = _try_phrase_match(tokens[i:], sounds, verbose)
-            if phrase_match:
-                matches.append(phrase_match)
-                i += consumed
-                continue
-
         # Try TTS generation for words with lowercase letters
         if any(c.islower() for c in tokens[i]):
             if should_generate_phrase(tokens[i], verbose):
@@ -152,26 +196,10 @@ def find_sound_matches(
                     continue
 
         # If no match found, handle based on config
-        if verbose >= 1:
-            print(f"No match found for token: {tokens[i]}")
-
-        if config.on_missing == "error":
-            raise ValueError(f"No match found for token: {tokens[i]}")
-        elif config.on_missing == "beep":
-            if config.beep_sound in sounds:
-                if verbose >= 1:
-                    print(f"Using beep sound for '{tokens[i]}' -> {config.beep_sound}")
-                matches.append(sounds[config.beep_sound])
-            else:
-                print(
-                    f"Warning: Beep sound not found: {config.beep_sound}",
-                    file=sys.stderr,
-                )
-        elif config.on_missing == "skip":
-            i += 1
-            continue
-        else:
-            raise ValueError(f"Invalid on_missing value: {config.on_missing}")
+        missing_sound = _handle_missing_sound(tokens[i], config, sounds, verbose)
+        if missing_sound:
+            matches.append(missing_sound)
+        i += 1
 
     return matches
 

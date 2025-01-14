@@ -148,17 +148,6 @@ def load_sound_files(config: Config, verbose: int = 0) -> Dict[str, str]:
             if path.is_dir():
                 continue
 
-            # skip any folders starting with NORMALIZATION_BLACKLIST
-            # Skip paths with components starting with normalization blacklist
-            rel_path = path.relative_to(directory)
-            if not any(
-                part.startswith(tuple(NORMALIZATION_BLACKLIST))
-                for part in rel_path.parts
-            ):
-                if verbose >= 2:
-                    print(f"Skipping blacklisted path: {path}")
-                continue
-
             # Check if the file extension is supported by Asterisk
             if path.suffix.lower() in SUPPORTED_ASTERISK_SOUND_EXTENSIONS:
                 # Check if file is readable
