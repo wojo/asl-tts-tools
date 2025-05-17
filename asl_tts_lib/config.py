@@ -16,7 +16,7 @@ class Config:
     cache_directory: Path = Path("/tmp/asl-tts-tools-cache")
 
     # Sound handling
-    on_missing: Literal["beep", "silence", "skip"] = "error"
+    on_missing: Literal["error", "beep", "skip"] = "error"
     beep_sound: str = "beep"
     silence_sound: str = "silence/1"
     max_phrase_words_for_filenames: int = 5
